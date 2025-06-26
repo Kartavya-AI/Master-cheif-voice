@@ -1,0 +1,45 @@
+cook_recipe:
+  description: |
+    {user_query}
+    Analyze the user's request to determine if they want:
+    1. A complete recipe for a specific dish
+    2. Recipe modifications or ingredient substitutions for an existing recipe
+    
+    Use your culinary expertise and web search tools to provide the appropriate response.
+    
+    For new recipes: Provide complete ingredients, instructions, and helpful tips.
+    For modifications: Focus on the specific substitutions or changes requested while 
+    explaining how they affect the dish.
+  
+  expected_output: |
+    Based on the user's request, provide either:
+    
+    **For complete recipes:**
+    ## [Dish Name]
+    
+    ### Ingredients:
+    - [quantity] [ingredient 1]
+    - [quantity] [ingredient 2] 
+    - [etc.]
+    
+    ### Instructions:
+    1. [Step 1 with detailed instructions]
+    2. [Step 2 with detailed instructions]
+    3. [Continue with all steps]
+    
+    ### Additional Notes:
+    - [Cooking tips, serving suggestions, variations]
+    
+    **For recipe modifications/substitutions:**
+    ## Suggested Changes for [Dish Name]
+    
+    ### Substitution Details:
+    - [Original ingredient] → [Substitute ingredient]
+    - [Explanation of how this affects taste, texture, or cooking method]
+    - [Any adjustments needed in quantities or cooking time]
+    
+    ### Modified Instructions:
+    - [Only include steps that change due to the substitution]
+    
+    ### Notes:
+    - [How the substitution impacts the final dish]
