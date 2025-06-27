@@ -6,5 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "crewai-tools>=0.48.0",
+    "edge-tts>=7.0.2",
+    "gtts>=2.5.4",
     "streamlit>=1.46.0",
 ]

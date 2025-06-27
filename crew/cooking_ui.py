@@ -2,10 +2,13 @@ import streamlit as st
 import re
 import io
 import base64
+import asyncio
 from datetime import datetime
 from src.crew.cook_crew import CookCrew
-import requests
-import json
+
+# TTS imports
+from gtts import gTTS
+import edge_tts
 
 # Initialize Crew and session state once
 if "crew_instance" not in st.session_state:
@@ -26,11 +29,11 @@ if "processing" not in st.session_state:
 if "voice_enabled" not in st.session_state:
     st.session_state.voice_enabled = False
 
-if "elevenlabs_api_key" not in st.session_state:
-    st.session_state.elevenlabs_api_key = ""
+if "tts_provider" not in st.session_state:
+    st.session_state.tts_provider = "gtts"
 
-if "selected_voice" not in st.session_state:
-    st.session_state.selected_voice = "Rachel"
+if "edge_voice" not in st.session_state:
+    st.session_state.edge_voice = "en-US-JennyNeural"
 
 st.set_page_config(
     page_title="AI Cooking Assistant", 
@@ -38,61 +41,88 @@ st.set_page_config(
     page_icon="👩‍🍳"
 )
 
-# ElevenLabs Configuration
-ELEVENLABS_VOICES = {
-    "Rachel": "21m00Tcm4TlvDq8ikWAM",
-    "Drew": "29vD33N1CtxCmqQRPOHJ", 
-    "Clyde": "2EiwWnXFnvU5JabPnv8n",
-    "Paul": "5Q0t7uMcjvnagumLfvZi",
-    "Domi": "AZnzlk1XvdvUeBnXmlld",
-    "Dave": "CYw3kZ02Hs0563khs1Fj",
-    "Fin": "D38z5RcWu1voky8WS1ja",
-    "Sarah": "EXAVITQu4vr4xnSDxMaL",
-    "Antoni": "ErXwobaYiN019PkySvjV",
-    "Thomas": "GBv7mTt0atIp3Br8iCZE"
+# TTS Provider Configuration
+TTS_PROVIDERS = {
+    "Google TTS (Free)": "gtts",
+    "Microsoft Edge TTS (Free)": "edge"
 }
 
-def text_to_speech(text, api_key, voice_id="21m00Tcm4TlvDq8ikWAM"):
-    """Convert text to speech using ElevenLabs API"""
-    if not api_key:
-        return None
-        
-    # Clean text for better speech synthesis
-    clean_text = re.sub(r'[*#`]', '', text)  # Remove markdown symbols
-    clean_text = re.sub(r'\n+', '. ', clean_text)  # Replace newlines with periods
-    clean_text = clean_text.strip()
-    
-    # Limit text length to avoid very long audio
-    if len(clean_text) > 500:
-        clean_text = clean_text[:500] + "..."
-    
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    
-    headers = {
-        "Accept": "audio/mpeg",
-        "Content-Type": "application/json",
-        "xi-api-key": api_key
-    }
-    
-    data = {
-        "text": clean_text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.5
-        }
-    }
-    
+EDGE_VOICES = {
+    "Jenny (US Female)": "en-US-JennyNeural",
+    "Davis (US Male)": "en-US-DavisNeural", 
+    "Aria (US Female)": "en-US-AriaNeural",
+    "Guy (US Male)": "en-US-GuyNeural",
+    "Emma (UK Female)": "en-GB-SoniaNeural",
+    "Ryan (UK Male)": "en-GB-RyanNeural",
+    "Libby (UK Female)": "en-GB-LibbyNeural"
+}
+
+# TTS Functions
+def gtts_speech(text):
+    """Google Text-to-Speech - Completely free"""
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=30)
-        if response.status_code == 200:
-            return response.content
-        else:
-            st.error(f"ElevenLabs API Error: {response.status_code}")
+        clean_text = re.sub(r'[*#`]', '', text)
+        clean_text = re.sub(r'\n+', '. ', clean_text)
+        clean_text = clean_text.strip()[:500]
+        
+        if not clean_text:
             return None
+            
+        tts = gTTS(text=clean_text, lang='en', slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        return fp.read()
     except Exception as e:
-        st.error(f"Voice synthesis error: {str(e)}")
+        st.error(f"Google TTS error: {str(e)}")
         return None
+
+async def edge_tts_async(text, voice="en-US-JennyNeural"):
+    """Microsoft Edge TTS async function"""
+    try:
+        clean_text = re.sub(r'[*#`]', '', text)
+        clean_text = re.sub(r'\n+', '. ', clean_text)
+        clean_text = clean_text.strip()[:500]
+        
+        if not clean_text:
+            return None
+            
+        communicate = edge_tts.Communicate(clean_text, voice)
+        audio_data = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_data += chunk["data"]
+        return audio_data
+    except Exception as e:
+        print(f"Edge TTS error: {str(e)}")
+        return None
+
+def edge_tts_speech(text, voice="en-US-JennyNeural"):
+    """Microsoft Edge TTS - Completely free, high quality"""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        audio_data = loop.run_until_complete(edge_tts_async(text, voice))
+        loop.close()
+        return audio_data
+    except Exception as e:
+        st.error(f"Edge TTS error: {str(e)}")
+        return None
+
+def generate_speech_audio(text):
+    """Generate speech audio based on selected provider"""
+    if not st.session_state.voice_enabled:
+        return None
+    
+    provider = st.session_state.tts_provider
+    
+    if provider == "gtts":
+        return gtts_speech(text)
+    elif provider == "edge":
+        voice = st.session_state.edge_voice
+        return edge_tts_speech(text, voice)
+    else:
+        return gtts_speech(text)  # Fallback to Google TTS
 
 def create_audio_player(audio_content):
     """Create an HTML audio player from audio content"""
@@ -181,6 +211,14 @@ st.markdown("""
         border-radius: 12px;
         font-size: 0.8em;
     }
+    
+    .provider-info {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 8px;
+        margin: 10px 0;
+        border-left: 4px solid #28a745;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -218,25 +256,43 @@ with st.sidebar:
         st.session_state.voice_enabled = voice_enabled
         
         if voice_enabled:
-            # API Key input
-            api_key = st.text_input(
-                "ElevenLabs API Key:", 
-                value=st.session_state.elevenlabs_api_key,
-                type="password",
-                help="Get your API key from https://elevenlabs.io"
+            # TTS Provider selection
+            selected_provider = st.selectbox(
+                "TTS Provider:",
+                list(TTS_PROVIDERS.keys()),
+                index=list(TTS_PROVIDERS.values()).index(st.session_state.tts_provider) if st.session_state.tts_provider in TTS_PROVIDERS.values() else 0
             )
-            st.session_state.elevenlabs_api_key = api_key
             
-            # Voice selection
-            selected_voice = st.selectbox(
-                "Select Voice:",
-                options=list(ELEVENLABS_VOICES.keys()),
-                index=list(ELEVENLABS_VOICES.keys()).index(st.session_state.selected_voice)
-            )
-            st.session_state.selected_voice = selected_voice
+            provider_key = TTS_PROVIDERS[selected_provider]
+            st.session_state.tts_provider = provider_key
             
-            if not api_key:
-                st.warning("⚠️ Please enter your ElevenLabs API key to enable voice")
+            # Provider-specific settings
+            if provider_key == "gtts":
+                st.markdown("""
+                <div class="provider-info">
+                    <strong>✅ Google TTS</strong><br>
+                    • Completely free<br>
+                    • No setup required<br>
+                    • Works immediately
+                </div>
+                """, unsafe_allow_html=True)
+                
+            elif provider_key == "edge":
+                selected_voice = st.selectbox(
+                    "Select Voice:",
+                    list(EDGE_VOICES.keys()),
+                    index=list(EDGE_VOICES.values()).index(st.session_state.edge_voice) if st.session_state.edge_voice in EDGE_VOICES.values() else 0
+                )
+                st.session_state.edge_voice = EDGE_VOICES[selected_voice]
+                
+                st.markdown("""
+                <div class="provider-info">
+                    <strong>✅ Microsoft Edge TTS</strong><br>
+                    • Completely free<br>
+                    • High quality voices<br>
+                    • Multiple voice options
+                </div>
+                """, unsafe_allow_html=True)
     
     # Other Settings
     memory_enabled = st.toggle("🧠 Memory", value=st.session_state.memory_active)
@@ -260,8 +316,6 @@ with st.sidebar:
 chat_container = st.container()
 
 with chat_container:
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    
     if not st.session_state.chat_history:
         st.markdown("""
         <div class="welcome-message">
@@ -289,8 +343,12 @@ with chat_container:
                 
                 # Bot message with voice
                 voice_indicator = ""
-                if st.session_state.voice_enabled and st.session_state.elevenlabs_api_key:
-                    voice_indicator = '<span class="voice-indicator">🔊 Voice</span>'
+                if st.session_state.voice_enabled:
+                    provider_name = {
+                        "gtts": "Google TTS",
+                        "edge": "Edge TTS"
+                    }.get(st.session_state.tts_provider, "TTS")
+                    voice_indicator = f'<span class="voice-indicator">🔊 {provider_name}</span>'
                 
                 st.markdown(f"""
                 <div class="bot-message">
@@ -301,12 +359,10 @@ with chat_container:
                 
                 # Generate and play audio for the latest bot response
                 if (st.session_state.voice_enabled and 
-                    st.session_state.elevenlabs_api_key and 
                     i == len(st.session_state.chat_history) - 1 and 
                     question != "SYSTEM"):
                     
-                    voice_id = ELEVENLABS_VOICES.get(st.session_state.selected_voice, "21m00Tcm4TlvDq8ikWAM")
-                    audio_content = text_to_speech(answer, st.session_state.elevenlabs_api_key, voice_id)
+                    audio_content = generate_speech_audio(answer)
                     
                     if audio_content:
                         audio_player = create_audio_player(audio_content)
@@ -319,8 +375,6 @@ with chat_container:
             🤔 Chef is thinking...
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # Input area
 st.markdown("---")
@@ -401,35 +455,11 @@ Please respond to the current question considering the context.
 elif send_clicked and not user_input.strip():
     st.warning("Please enter a message!")
 
-# Quick actions
-if st.session_state.chat_history:
-    st.markdown("### 🚀 Quick Actions")
-    col1, col2, col3, col4 = st.columns(4)
-    
-    quick_actions = [
-        ("🍝 Pasta", "Show me pasta recipes"),
-        ("🥗 Healthy", "Give me healthy meal ideas"), 
-        ("⚡ Quick", "What can I cook quickly?"),
-        ("🔄 Substitute", "Help with substitutions")
-    ]
-    
-    for i, (col, (label, message)) in enumerate(zip([col1, col2, col3, col4], quick_actions)):
-        with col:
-            if st.button(label, key=f"quick_{i}"):
-                st.session_state.processing = True
-                # Simulate user input
-                try:
-                    crew = st.session_state.crew_instance.cooking_crew()
-                    result = crew.kickoff(inputs={"user_query": message})
-                    st.session_state.chat_history.append((message, str(result)))
-                    st.session_state.processing = False
-                    st.rerun()
-                except Exception as e:
-                    st.session_state.chat_history.append((message, f"Error: {str(e)}"))
-                    st.session_state.processing = False
-                    st.rerun()
-
 # Voice feature info
 if st.session_state.voice_enabled:
     st.markdown("---")
-    st.info("🎙️ **Voice Feature Active** - Chef AI responses will be spoken aloud! Make sure your volume is on.")
+    provider_info = {
+        "gtts": "🎙️ **Google TTS Active** - Free text-to-speech enabled!",
+        "edge": "🎙️ **Microsoft Edge TTS Active** - High-quality free voices enabled!"
+    }
+    st.info(provider_info.get(st.session_state.tts_provider, "🎙️ **Voice Feature Active**") + " Make sure your volume is on.")
