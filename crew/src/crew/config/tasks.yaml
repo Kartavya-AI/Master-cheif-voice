@@ -1,45 +1,47 @@
 cook_recipe:
-  description: |
-    {user_query}
-    Analyze the user's request to determine if they want:
-    1. A complete recipe for a specific dish
-    2. Recipe modifications or ingredient substitutions for an existing recipe
+  description: >
+    Provide interactive step-by-step cooking guidance for the user's recipe request: {user_query}
     
-    Use your culinary expertise and web search tools to provide the appropriate response.
+    IMPORTANT STEP PROGRESSION RULES:
+    - Start with Step 1 for new recipes
+    - When user says "next", "done", or "ready", provide the NEXT sequential step (Step 2, then Step 3, etc.)
+    - When user says "repeat", provide the SAME current step again
+    - Always track which step number you're currently on
+    - The "Next up" preview should accurately show what Step X+1 will be
     
-    For new recipes: Provide complete ingredients, instructions, and helpful tips.
-    For modifications: Focus on the specific substitutions or changes requested while 
-    explaining how they affect the dish.
-  
-  expected_output: |
-    Based on the user's request, provide either:
+    Give one step at a time and wait for user confirmation before providing the next step. 
+    Use culinary expertise and web search when needed.
+
+  expected_output: >
+    ### Current Step: [Step Number]
+    **[Single, specific cooking action with timing and technique details]**
     
-    **For complete recipes:**
-    ## [Dish Name]
+    *Let me know when you're done with this step by saying "done", "next", or "ready"*
     
-    ### Ingredients:
-    - [quantity] [ingredient 1]
-    - [quantity] [ingredient 2] 
-    - [etc.]
+    **Progress:** Step [X] of [Total] | Next up: [Brief preview of what Step X+1 will be]
+
+notes_making:
+  description: >
+    Document the current step being provided to the user, including all techniques, 
+    timing, and details for the cooking history record. Keep track of step progression
+    and ensure continuity between steps.
     
-    ### Instructions:
-    1. [Step 1 with detailed instructions]
-    2. [Step 2 with detailed instructions]
-    3. [Continue with all steps]
+  expected_output: >
+    Step [X]: [Complete description of the current step with timing, technique notes, 
+    and any tips provided. Include context about how this step fits in the overall recipe.]
+
+final_output:
+  description: >
+    Structure the response with the current recipe step for the user and step documentation for history.
     
-    ### Additional Notes:
-    - [Cooking tips, serving suggestions, variations]
+    CRITICAL: Ensure step numbering is sequential and consistent:
+    - For new recipes: Start with Step 1
+    - For "next"/"done"/"ready" commands: Progress to the next sequential step (Step 2 → Step 3 → Step 4, etc.)
+    - For "repeat" commands: Keep the same step number
+    - The "Next up" preview must accurately describe what the next sequential step will contain
     
-    **For recipe modifications/substitutions:**
-    ## Suggested Changes for [Dish Name]
-    
-    ### Substitution Details:
-    - [Original ingredient] → [Substitute ingredient]
-    - [Explanation of how this affects taste, texture, or cooking method]
-    - [Any adjustments needed in quantities or cooking time]
-    
-    ### Modified Instructions:
-    - [Only include steps that change due to the substitution]
-    
-    ### Notes:
-    - [How the substitution impacts the final dish]
+  expected_output: >
+    {
+      "cook_recipe": "### Current Step: [Step Number]\n**[Single, specific cooking action with timing and technique details]**\n\n*Let me know when you're done with this step by saying \"done\", \"next\", or \"ready\"*\n\n**Progress:** Step [X] of [Total] | Next up: [Accurate preview of what Step X+1 will be]",
+      "notes_making": "Step [X]: [Complete description of the current step with timing, technique notes, and context about how this step fits in the overall recipe]"
+    }

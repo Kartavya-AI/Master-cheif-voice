@@ -28,12 +28,40 @@ class CookCrew():
             tools=[search_tool],
             memory=True,
         )
+    @agent
+    def notes_maker_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['notes_maker'],
+            llm=llm,
+            tools=[search_tool],
+            memory=True,
+        )
+    @agent
+    def final_output_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['final_output'],
+            llm=llm,
+            tools=[search_tool],
+            memory=True,
+        )
 
     @task
     def cook_recipe(self) -> Task:
         return Task(
             config=self.tasks_config['cook_recipe'],
             agent=self.recipe_agent()
+        )
+    @task
+    def make_notes(self) -> Task:
+        return Task(
+            config=self.tasks_config['notes_making'],
+            agent=self.notes_maker_agent()
+        )
+    @task
+    def final_output(self) -> Task:
+        return Task(
+            config=self.tasks_config['final_output'],
+            agent=self.final_output_agent()
         )
 
     @crew
