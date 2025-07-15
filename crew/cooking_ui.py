@@ -16,7 +16,6 @@ import tempfile
 import edge_tts
 import io
 import logging
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,21 +41,38 @@ def init_session_state():
         "stt_enabled": False,
         "listening": False,
         "debug": False,
-        "nav_command": None
+        "nav_command": None,
+        "fal_key": os.getenv("FAL_KEY", ""),
+        "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),
+        "serper_api_key": os.getenv("SERPER_API_KEY", ""),
+        "api_keys_configured": False
     }
     
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
     
-    # Initialize crew instance if not exists
-    if st.session_state.crew_instance is None:
+    # Check if API keys are configured
+    st.session_state.api_keys_configured = bool(
+        st.session_state.fal_key and 
+        st.session_state.gemini_api_key and 
+        st.session_state.serper_api_key
+    )
+    
+    # Initialize crew instance if not exists and API keys are configured
+    if st.session_state.crew_instance is None and st.session_state.api_keys_configured:
         try:
+            # Set environment variables from session state
+            os.environ["FAL_KEY"] = st.session_state.fal_key
+            os.environ["GEMINI_API_KEY"] = st.session_state.gemini_api_key
+            os.environ["SERPER_API_KEY"] = st.session_state.serper_api_key
+            
             st.session_state.crew_instance = CookCrew()
             logger.info("✅ Crew instance initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize crew: {str(e)}")
             st.error(f"Failed to initialize AI crew: {str(e)}")
+            st.session_state.crew_instance = None
 
 # Initialize session state
 init_session_state()
@@ -540,6 +556,10 @@ def generate_fal_speech(text):
         if len(clean_text) > 500:
             clean_text = clean_text[:500] + "..."
         
+        # Set FAL key from session state
+        if st.session_state.fal_key:
+            os.environ["FAL_KEY"] = st.session_state.fal_key
+        
         def on_queue_update(update):
             if isinstance(update, fal_client.InProgress):
                 for log in update.logs:
@@ -594,11 +614,40 @@ def generate_speech_with_fallback(text):
 
 def validate_api_keys():
     """Validate that all required API keys are present"""
-    fal_key = os.getenv("FAL_KEY")
-    if not fal_key:
-        st.warning("⚠️ FAL_KEY not found in environment variables")
+    missing_keys = []
+    
+    if not st.session_state.fal_key:
+        missing_keys.append("FAL_KEY")
+    if not st.session_state.gemini_api_key:
+        missing_keys.append("GEMINI_API_KEY") 
+    if not st.session_state.serper_api_key:
+        missing_keys.append("SERPER_API_KEY")
+    
+    if missing_keys:
+        st.warning(f"⚠️ Missing API keys: {', '.join(missing_keys)}")
         return False
+    
     return True
+
+def reinitialize_crew():
+    """Reinitialize the crew with updated API keys"""
+    try:
+        # Update environment variables
+        os.environ["FAL_KEY"] = st.session_state.fal_key
+        os.environ["GEMINI_API_KEY"] = st.session_state.gemini_api_key
+        os.environ["SERPER_API_KEY"] = st.session_state.serper_api_key
+        
+        # Reinitialize crew
+        st.session_state.crew_instance = CookCrew()
+        st.session_state.api_keys_configured = True
+        logger.info("✅ Crew instance reinitialized successfully")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to reinitialize crew: {str(e)}")
+        st.error(f"Failed to initialize AI crew: {str(e)}")
+        st.session_state.crew_instance = None
+        st.session_state.api_keys_configured = False
+        return False
 
 def format_recipe_step(recipe_text):
     """Format recipe step for display with proper styling"""
@@ -770,19 +819,74 @@ add_speech_to_text_js()
 with st.sidebar:
     st.header("⚙️ Settings")
     
+    # API Key Configuration
+    st.markdown("### 🔑 API Configuration")
+    with st.expander("API Keys", expanded=not st.session_state.api_keys_configured):
+        st.markdown("**Required API Keys:**")
+        
+        # FAL Key
+        fal_key_input = st.text_input(
+            "FAL Key:",
+            value=st.session_state.fal_key,
+            type="password",
+            help="Required for TTS and AI services"
+        )
+        if fal_key_input != st.session_state.fal_key:
+            st.session_state.fal_key = fal_key_input
+        
+        # Gemini API Key
+        gemini_key_input = st.text_input(
+            "Gemini API Key:",
+            value=st.session_state.gemini_api_key,
+            type="password",
+            help="Required for AI cooking assistance"
+        )
+        if gemini_key_input != st.session_state.gemini_api_key:
+            st.session_state.gemini_api_key = gemini_key_input
+        
+        # Serper API Key
+        serper_key_input = st.text_input(
+            "Serper API Key:",
+            value=st.session_state.serper_api_key,
+            type="password",
+            help="Required for web search functionality"
+        )
+        if serper_key_input != st.session_state.serper_api_key:
+            st.session_state.serper_api_key = serper_key_input
+        
+        # Save and validate button
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Keys", use_container_width=True):
+                if validate_api_keys():
+                    if reinitialize_crew():
+                        st.success("✅ API keys saved and crew initialized!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to initialize with new keys")
+                else:
+                    st.error("❌ Please fill in all API keys")
+        
+        with col2:
+            if st.button("� Test Keys", use_container_width=True):
+                if validate_api_keys():
+                    st.success("✅ All API keys are present")
+                else:
+                    st.error("❌ Missing API keys")
+        
+        # Status indicator
+        if st.session_state.api_keys_configured:
+            st.success("🟢 API keys configured")
+        else:
+            st.error("🔴 API keys not configured")
+            st.warning("Please configure all API keys to use the cooking assistant.")
+    
     # Debug mode
     debug_enabled = st.toggle("🐛 Debug Mode", value=st.session_state.debug)
     st.session_state.debug = debug_enabled
     
     memory_enabled = st.toggle("🧠 Memory", value=st.session_state.memory_active)
     st.session_state.memory_active = memory_enabled
-    
-    # Validate API keys
-    if st.button("🔑 Validate API Keys"):
-        if validate_api_keys():
-            st.success("✅ All API keys valid")
-        else:
-            st.error("❌ Missing API keys")
     
     st.markdown("### 🎤 Speech-to-Text Settings")
     with st.expander("STT Configuration", expanded=st.session_state.stt_enabled):
@@ -894,7 +998,11 @@ if st.session_state.debug:
         st.json(debug_state)
         
         st.markdown("#### Environment")
-        st.write(f"FAL_KEY present: {'✅' if os.getenv('FAL_KEY') else '❌'}")
+        st.write(f"FAL_KEY present: {'✅' if st.session_state.fal_key else '❌'}")
+        st.write(f"GEMINI_API_KEY present: {'✅' if st.session_state.gemini_api_key else '❌'}")
+        st.write(f"SERPER_API_KEY present: {'✅' if st.session_state.serper_api_key else '❌'}")
+        st.write(f"API keys configured: {'✅' if st.session_state.api_keys_configured else '❌'}")
+        st.write(f"Crew initialized: {'✅' if st.session_state.crew_instance else '❌'}")
         st.write(f"Chat history length: {len(st.session_state.chat_history)}")
         st.write(f"Recipe notes length: {len(st.session_state.recipe_notes)}")
 
@@ -903,6 +1011,21 @@ chat_container = st.container()
 
 with chat_container:
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    
+    # Show API key warning if not configured
+    if not st.session_state.api_keys_configured:
+        st.error("""
+        🔑 **API Keys Required**
+        
+        Please configure your API keys in the sidebar to use the cooking assistant:
+        - **FAL Key**: For text-to-speech and AI services
+        - **Gemini API Key**: For AI cooking assistance  
+        - **Serper API Key**: For web search functionality
+        
+        Click on "API Keys" in the sidebar to get started!
+        """)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.stop()
     
     if not st.session_state.chat_history:
         st.markdown("""
@@ -1123,6 +1246,11 @@ with col1:
 def process_user_input(input_text):
     """Process user input and get response from crew"""
     if not input_text.strip():
+        return
+    
+    # Check if API keys are configured
+    if not st.session_state.api_keys_configured or not st.session_state.crew_instance:
+        st.error("❌ Please configure all API keys in the sidebar before using the assistant.")
         return
     
     st.session_state.processing = True
