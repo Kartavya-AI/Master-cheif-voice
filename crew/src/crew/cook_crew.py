@@ -2,6 +2,7 @@ from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 from dotenv import load_dotenv
 from src.crew.tools.serper import SerperDevTool
+from src.crew.tools.contextsaver import get_from_memory
 import os
 
 load_dotenv()
@@ -25,15 +26,7 @@ class CookCrew():
         return Agent(
             config=self.agents_config['cooking_expert'],
             llm=llm,
-            tools=[search_tool],
-            memory=True,
-        )
-    @agent
-    def notes_maker_agent(self) -> Agent:
-        return Agent(
-            config=self.agents_config['notes_maker'],
-            llm=llm,
-            tools=[search_tool],
+            tools=[get_from_memory,search_tool],
             memory=True,
         )
     @agent
@@ -49,13 +42,8 @@ class CookCrew():
     def cook_recipe(self) -> Task:
         return Task(
             config=self.tasks_config['cook_recipe'],
+            tools=[search_tool, get_from_memory],
             agent=self.recipe_agent()
-        )
-    @task
-    def make_notes(self) -> Task:
-        return Task(
-            config=self.tasks_config['notes_making'],
-            agent=self.notes_maker_agent()
         )
     @task
     def final_output(self) -> Task:

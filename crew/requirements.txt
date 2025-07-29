@@ -1,0 +1,8 @@
+gunicorn
+streamlit
+openai
+fal-client
+python-dotenv
+edge-tts
+crewai
+google-cloud-speech

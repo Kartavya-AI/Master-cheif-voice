@@ -460,7 +460,6 @@ dependencies = [
     { name = "fal-client" },
     { name = "google-cloud-speech" },
     { name = "gtts" },
-    { name = "pysqlite3-binary" },
     { name = "streamlit" },
 ]
 
@@ -471,7 +470,6 @@ requires-dist = [
     { name = "fal-client", specifier = ">=0.7.0" },
     { name = "google-cloud-speech", specifier = ">=2.33.0" },
     { name = "gtts", specifier = ">=2.5.4" },
-    { name = "pysqlite3-binary", specifier = "==0.5.4" },
     { name = "streamlit", specifier = ">=1.46.0" },
 ]
 
@@ -2697,14 +2695,6 @@ version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/48/0a/c99fb7d7e176f8b176ef19704a32e6a9c6aafdf19ef75a187f701fc15801/pysbd-0.3.4-py3-none-any.whl", hash = "sha256:cd838939b7b0b185fcf86b0baf6636667dfb6e474743beeff878e9f42e022953", size = 71082 },
-]
-
-[[package]]
-name = "pysqlite3-binary"
-version = "0.5.4"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/ed/f6638728ea46bf90f0fba63d7f53a57cbab1ba7d34a1eb86419ca582a797/pysqlite3_binary-0.5.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bb3653a0eb0ef5db2d0ed49d43b11ab4be24fdf5b2e65a39650fc59348e30dc6", size = 5188499 },
 ]
 
 [[package]]

@@ -11,5 +11,4 @@ dependencies = [
     "google-cloud-speech>=2.33.0",
     "gtts>=2.5.4",
     "streamlit>=1.46.0",
-    "pysqlite3-binary==0.5.4"
 ]
