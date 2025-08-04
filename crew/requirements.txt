@@ -1,3 +1,4 @@
+fastapi
 uvicorn
 gunicorn
 streamlit
@@ -7,3 +8,4 @@ python-dotenv
 edge-tts
 crewai
 google-cloud-speech
+
