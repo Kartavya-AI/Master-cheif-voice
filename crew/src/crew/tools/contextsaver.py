@@ -76,28 +76,36 @@ def get_from_memory(request_body: str) -> Union[str, List[Dict[str, Union[str, l
         Union[str, List[Dict]]: A list of formatted memory entries or a message if none found.
     """
     try:
+        # Parse the JSON string
         data = json.loads(request_body)
         query = data.get("query")
         user_id = data.get("user_id")
         
+        # Validate required fields
         if not query or not user_id:
             return "Both 'query' and 'user_id' must be provided in the request."
 
+        # Search using the parsed query and user_id
         results = client.search(query, user_id=user_id)
 
+        # Check if results exist
         if not results:
             return "No memory found for the given query."
 
-        formatted = [
-            {
-                "id": r["id"],
-                "memory": r["memory"],
+        # Format the results
+        formatted = []
+        for r in results:
+            formatted_entry = {
+                "id": r.get("id"),  # Use .get() for safer access
+                "memory": r.get("memory"),
                 "categories": r.get("categories", []),
-                "created_at": r["created_at"]
+                "created_at": r.get("created_at")
             }
-            for r in results
-        ]
+            formatted.append(formatted_entry)
+        
         return formatted
 
-    except json.JSONDecodeError:
-        return "Invalid JSON input."
+    except json.JSONDecodeError as e:
+        return f"Invalid JSON input: {str(e)}"
+    except Exception as e:
+        return f"Error retrieving memory: {str(e)}"
