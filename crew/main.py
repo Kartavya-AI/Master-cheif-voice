@@ -7,6 +7,7 @@ from src.crew.cook_crew import CookCrew
 from src.crew.tools.contextsaver import add_to_history
 import json
 import os
+import re
 # Initialize FastAPI app
 app = FastAPI(
     title="CookCrew Assistant API",
@@ -69,30 +70,71 @@ async def ask_cooking_question(request: CookingQuery):
         crew = cook_crew.cooking_crew()
         
         # Pass the query as inputs to kickoff method
-        result = crew.kickoff(inputs={"user_query": "user is looking for recipe + " + request.user_query, "user_id": request.user_id})
+        result = crew.kickoff(inputs={"user_query": "user is looking for recipe " + request.user_query, "user_id": request.user_id})
 
         # Save conversation to memory if requested
         memory_status = None
         if request.save_to_memory:
             try:
                 # Save user query to memory
+                
+                # Process the assistant response more safely
+                cleaned_response = None
+                try:
+                    # Clean the JSON response - handle multiple markdown patterns
+                    raw_content = str(result.raw) if hasattr(result, 'raw') else str(result)
+                    
+                    # More comprehensive regex to handle various markdown formats
+                    # Remove ```json at start and ``` at end (with optional whitespace)
+                    cleaned = re.sub(r"^\s*```json\s*\n?|```\s*$", "", raw_content.strip(), flags=re.MULTILINE)
+                    
+                    # Also handle cases where it might just be ``` without json
+                    cleaned = re.sub(r"^\s*```\s*\n?|```\s*$", "", cleaned.strip(), flags=re.MULTILINE)
+                    
+                    print(f"Raw content: {raw_content[:200]}...")  # Debug: show first 200 chars
+                    print(f"Cleaned content: {cleaned[:200]}...")  # Debug: show first 200 chars
+                    
+                    # Try to parse JSON
+                    parsed_result = json.loads(cleaned)
+                    
+                    # Extract step_summary safely
+                    if isinstance(parsed_result, dict) and "step_summary" in parsed_result:
+                        cleaned_response = parsed_result["step_summary"]
+                    else:
+                        # Fallback to the entire cook_recipe or raw response
+                        cleaned_response = parsed_result.get("cook_recipe", str(parsed_result))
+                        
+                except (json.JSONDecodeError, AttributeError) as parse_error:
+                    print(f"Failed to parse JSON response: {parse_error}")
+                    print(f"Problematic content: {cleaned if 'cleaned' in locals() else raw_content}")
+                    # Fallback to raw response
+                    cleaned_response = raw_content
+                
+                print(f"Cleaned step summary: {cleaned_response}")
+                
+                # Save LLM response to memory with correct role
+                # Fix: Use "assistant" instead of user_id + "assistant"
                 user_memory = add_to_history(
+                    [
                     {"role": "user", "content": request.user_query},
+                    {"role":"assistant", "content": cleaned_response},
+                    ],
                     user_id=request.user_id
                 )
-                
-                # Save assistant response to memory
-                assistant_memory = add_to_history(
-                    {"role": "assistant", "content": str(result)},
-                    user_id=request.user_id
-                )
-                
+
+                print(f"User memory: {user_memory}")
                 memory_status = {
                     "user_message": user_memory,
-                    "assistant_response": assistant_memory
+                    "assistant_response": cleaned_response,
+                    "status": "success"
                 }
+                
             except Exception as memory_error:
-                memory_status = f"Memory save failed: {str(memory_error)}"
+                print(f"Memory save error: {memory_error}")
+                memory_status = {
+                    "status": "failed",
+                    "error": str(memory_error)
+                }
         
         return {
             "status": "success",
@@ -148,3 +190,7 @@ async def health_check():
             "message": f"CookCrew initialization failed: {str(e)}",
             "cooking_crew_status": "failed"
         }
+    
+if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
