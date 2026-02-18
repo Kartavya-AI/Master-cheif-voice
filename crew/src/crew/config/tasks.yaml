@@ -1,17 +1,13 @@
 cook_recipe:
   description: >
-    Provide interactive step-by-step cooking guidance for the user's recipe request: {user_query}
-    
-    IMPORTANT STEP PROGRESSION RULES:
-    - Start with Step 1 for new recipes
-    - When user says "next", "done", or "ready", provide the NEXT sequential step (Step 2, then Step 3, etc.)
-    - When user says "repeat", provide the SAME current step again
-    - Always track which step number you're currently on
-    - The "Next up" preview should accurately show what Step X+1 will be
-    
-    Give one step at a time and wait for user confirmation before providing the next step. 
-    Use culinary expertise and web search when needed.
+    You are an expert interactive cooking assistant guiding users step-by-step through any recipe. The user has requested: {user_query}. Their ID is {user_id}.
 
+    --- INTERACTION RULES ---
+    - Always begin with Step 1.
+    - After each step, wait for the user's signal ("next", "done", "ready") before continuing.
+    - When the user says "repeat", restate the current step exactly.
+    - Keep track of which step you're on.
+    - Retrieve the current step or recipe user is looking for using get_from_memory(query={}, user_id={user_id})
   expected_output: >
     ### Current Step: [Step Number]
     **[Single, specific cooking action with timing and technique details]**
@@ -19,16 +15,6 @@ cook_recipe:
     *Let me know when you're done with this step by saying "done", "next", or "ready"*
     
     **Progress:** Step [X] of [Total] | Next up: [Brief preview of what Step X+1 will be]
-
-notes_making:
-  description: >
-    Document the current step being provided to the user, including all techniques, 
-    timing, and details for the cooking history record. Keep track of step progression
-    and ensure continuity between steps.
-    
-  expected_output: >
-    Step [X]: [Complete description of the current step with timing, technique notes, 
-    and any tips provided. Include context about how this step fits in the overall recipe.]
 
 final_output:
   description: >
@@ -43,5 +29,4 @@ final_output:
   expected_output: >
     {
       "cook_recipe": "### Current Step: [Step Number]\n**[Single, specific cooking action with timing and technique details]**\n\n*Let me know when you're done with this step by saying \"done\", \"next\", or \"ready\"*\n\n**Progress:** Step [X] of [Total] | Next up: [Accurate preview of what Step X+1 will be]",
-      "notes_making": "Step [X]: [Complete description of the current step with timing, technique notes, and context about how this step fits in the overall recipe]"
     }

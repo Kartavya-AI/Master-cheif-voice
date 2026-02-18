@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+gunicorn
+streamlit
+openai
+fal-client
+python-dotenv
+edge-tts
+crewai
+crewai_tools
+google-cloud-speech
+python-multipart
+crewai-tools
+
